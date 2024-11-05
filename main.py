@@ -18,6 +18,7 @@ df = dbf.to_dataframe()
 # print(df)
 data_all_num = []
 dict_num = {}
+numR_snils = {}
 for row in df.itertuples():
     # print(row.docNum, row.emdr_id)
 
@@ -25,6 +26,7 @@ for row in df.itertuples():
     data_all_num.append(docNum)
 
     dict_num[docNum] = [row.DATE_VR, row.PCOD]
+    numR_snils[docNum] = row.SNILS
 
 #-------------------------------------------------------------------------------
 # Работаем с ответом из РЭМД (csv файл) 
@@ -73,11 +75,17 @@ for numR in data_none:
         continue
     text = x['error_txt'].values[-1]
     vrach = x['FIO_Signer'].values[0]
+    messId = x['messId'].values[0]
+    Snils_vrach = x['Snils_Signer'].values[0]
+    Snils_pasient = 'нет данных о СНИЛС'
+    if numR in numR_snils:
+        Snils_pasient = numR_snils[numR]
+
     if str(text) == 'nan':
         text = 'ХЗ, что то не так, ждем ответа от РЭМД...'
         
     # print(numR, text, vrach)
-    error_SEMD.append({'Рецепт_№':numR, 'ОШИБКА':text, 'Врач':vrach})
+    error_SEMD.append({'Рецепт_№':numR,'messId':messId,'ОШИБКА':text, 'Врач':vrach, 'Врач_снилс':Snils_vrach, 'Пациент_СНИЛС':Snils_pasient})
     
 df_error_semd = pd.DataFrame(data=error_SEMD)
 df_error_semd.to_excel('ERROR_SEMD.xlsx', index=False)
