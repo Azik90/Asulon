@@ -17,8 +17,9 @@ df_all = pd.read_csv(file_path2, sep=';', encoding='windows-1251')
 df = dbf.to_dataframe()
 # print(df)
 data_all_num = []
-dict_num = {}
-numR_snils = {}
+dict_num = {} # для связки номера рецепта с датой выписки и врачем
+numR_snils = {} #для связки номера рецепта со СНИЛС пацента
+
 for row in df.itertuples():
     # print(row.docNum, row.emdr_id)
 
@@ -26,8 +27,10 @@ for row in df.itertuples():
     data_all_num.append(docNum)
 
     dict_num[docNum] = [row.DATE_VR, row.PCOD]
-    numR_snils[docNum] = row.SNILS
 
+    # ключи номеров рецептов запишем в словарь без пробелов
+    docNum = docNum.replace(' ','')
+    numR_snils[docNum] = row.SNILS
 #-------------------------------------------------------------------------------
 # Работаем с ответом из РЭМД (csv файл) 
 data = {} 
@@ -78,16 +81,19 @@ for numR in data_none:
     messId = x['messId'].values[0]
     Snils_vrach = x['Snils_Signer'].values[0]
     Snils_pasient = 'нет данных о СНИЛС'
-    if numR in numR_snils:
-        Snils_pasient = numR_snils[numR]
+    date = 'None, скорее всего рецепт испорчен'
+
+    n = numR.replace(' ','')
+    if n in numR_snils:
+        Snils_pasient = numR_snils[n]
+        date = (dict_num[numR])[0]
 
     if str(text) == 'nan':
         text = 'ХЗ, что то не так, ждем ответа от РЭМД...'
-        
-    # print(numR, text, vrach)
-    error_SEMD.append({'Рецепт_№':numR,'messId':messId,'ОШИБКА':text, 'Врач':vrach, 'Врач_снилс':Snils_vrach, 'Пациент_СНИЛС':Snils_pasient})
+
+    error_SEMD.append({'Рецепт_№':numR,'messId':messId,'ОШИБКА':text, 'Врач':vrach, 'Врач_СНИЛС':Snils_vrach, 'Пациент_СНИЛС':Snils_pasient, 'ДАТА рецепта':date})
     
 df_error_semd = pd.DataFrame(data=error_SEMD)
 df_error_semd.to_excel('ERROR_SEMD.xlsx', index=False)
 
-input('Конец выполнения скприта, нажми ENTER...')
+input('Конец выполнения скрипта, нажми ENTER...')
