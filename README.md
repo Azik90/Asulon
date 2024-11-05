@@ -12,6 +12,6 @@
 -   
 Версия Python 3.8.3
 библиотеки:
-- pandas == 2.0.3
+- pandas == 2.2.3
 - openpyxl == 3.1.3
 - simpledbf == 0.2.6
