@@ -8,10 +8,18 @@ root.withdraw()  # Скрыть главное окно
 print('Выбери форму Ф030 dbf')
 file_path = filedialog.askopenfilename()  # Открыть диалоговое окно выбора файла
 dbf = Dbf5(file_path, codec='CP866')
-# dbf = Dbf5('F030A.dbf', codec='CP866')
+
 print('Выбери отчет РЭМД csv')
 file_path2 = filedialog.askopenfilename()  # Открыть диалоговое окно выбора файла
 df_all = pd.read_csv(file_path2, sep=';', encoding='windows-1251')
+
+print('Выбери ExpVipSEMD_All dbf')
+file_path = filedialog.askopenfilename()  # Открыть диалоговое окно выбора файла
+dbf7 = Dbf5(file_path, codec='CP866')
+df7 = dbf7.to_dataframe()
+print()
+print('  Ждите пару минут, идет обработка файлов ...')
+print()
 #--------------------------------------------------------------------------
 # Работаем с формой Ф-030А (dbf файл) 
 df = dbf.to_dataframe()
@@ -35,23 +43,29 @@ for row in df.itertuples():
 # Работаем с ответом из РЭМД (csv файл) 
 data = {} 
 data_none = []
+data_reg =[]
 for row in df_all.itertuples():
     # print(row.docNum, row.emdr_id)
 
     id_remd = str(row.emdr_id)
     # Есть ли такой номер рецепта уже в словаре
     if row.docNum in data:
-        # Проверям. были ли ранее ответ от РЭМДа
+        # Проверям. Были ли ранее ответ от РЭМДа, если был то ничего не сохраняем - переходим к следующей итерации
         if id_remd == 'nan' and str(data[row.docNum]) != 'nan':
             # print(row.docNum, data[row.docNum])
             continue
 
-    data[row.docNum] = id_remd
+    data[row.docNum] = id_remd  # ключ - номер рецепта, значение - рег.номер РЭМД
 
 for key in data:
     # рецепты с ошибкой из РЭМД
     if data[key] == 'nan':
         data_none.append(key)
+
+    # рецепты зарегистрированные в РЭМД
+    else:
+        data_reg.append(key)
+
 #--------------------------------------------------------------------------------
 
 not_SEMD = []
@@ -61,8 +75,31 @@ for numR in data_all_num:
         pass
     else:
         # Не был отправлен в РЭМД
-        # print('Врач не подписал СЭМД (не создан), номер рецепта: ',numR, dict_num[numR][0], dict_num[numR][1])
-        not_SEMD.append({'Рецепт_№':numR, 'Дата':dict_num[numR][0], 'Врач':dict_num[numR][1], 'текст':'Врач не подписал с ЭПЦ выписанный рецепт (СЭМД не сформирован)'})
+        ExpVipSEMD_All = []
+        # сначала проверим подпись врача
+        num7 = numR[4:]
+
+        text7 = num7 + '.xml успешно подписан'
+        for row in df7.itertuples():
+
+            if row.DATE.year != 2024:
+                continue
+
+            if text7 in row.MSG:
+
+                text = (row.MSG).split('.')
+                text2 = text[0].split('_')
+                num = text2[0] + text2[1]
+
+                ExpVipSEMD_All.append({'DATE': row.DATE, 'TIME': row.TIME, 'MSG': row.MSG, 'НОМЕР РЕЦЕПТА': num, })
+
+        if ExpVipSEMD_All == []: # список пустой, врач не подписывал
+            not_SEMD.append({'Рецепт_№':numR, 'Дата':dict_num[numR][0], 'Врач':dict_num[numR][1], 'текст':'Врач не подписал с ЭПЦ выписанный рецепт (СЭМД не сформирован)'})
+        else: # список не пустой, врач подписал. Но Асулон в РИП не отправил!
+            time1 = ExpVipSEMD_All[-1]['TIME']
+            date1 = ExpVipSEMD_All[-1]['DATE']
+            MSG1 = ExpVipSEMD_All[-1]['MSG'] + '  но в РИП СУИЗ не отправлен! напиши в техподдержку'
+            not_SEMD.append({'Рецепт_№': numR, 'Дата': dict_num[numR][0], 'Врач': dict_num[numR][1], 'текст': MSG1, 'ДАТА последней подписи': date1, 'Время': time1})
 
 df_n_semd = pd.DataFrame(data=not_SEMD)
 # Не отправленые в РЭМД (не созданные)
@@ -75,6 +112,7 @@ for numR in data_none:
     x = df_all[df_all['docNum'] == numR]
     if 'NOT_UNIQUE_PROVIDED_ID' in x['error_id'].values:
         # Уже зареганные в РЭМД за ошибку не считаем
+        data_reg.append(numR)
         continue
     text = x['error_txt'].values[-1]
     vrach = x['FIO_Signer'].values[0]
@@ -89,11 +127,15 @@ for numR in data_none:
         date = (dict_num[numR])[0]
 
     if str(text) == 'nan':
-        text = 'ХЗ, что то не так, ждем ответа от РЭМД...'
+        text = 'РИП СУИЗ не вернул ответ РЭМДа в АСУЛОН. Пиши в техподдержку, если с даты отправки СЭМД прошло более 3-х дней '
 
     error_SEMD.append({'Рецепт_№':numR,'messId':messId,'ОШИБКА':text, 'Врач':vrach, 'Врач_СНИЛС':Snils_vrach, 'Пациент_СНИЛС':Snils_pasient, 'ДАТА рецепта':date})
     
 df_error_semd = pd.DataFrame(data=error_SEMD)
 df_error_semd.to_excel('ERROR_SEMD.xlsx', index=False)
 
+# отсортируем список зарегистрированных
+data_reg.sort()
+df_reg_semd = pd.DataFrame(data=data_reg)
+df_reg_semd.to_excel('REG_SEMD.xlsx', index=False)
 input('Конец выполнения скрипта, нажми ENTER...')
