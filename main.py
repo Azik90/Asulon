@@ -5,7 +5,7 @@ from tkinter import filedialog
 
 root = tk.Tk()
 root.withdraw()  # Скрыть главное окно
-print('Выбери форму Ф030 dbf')
+print('Выбери форму F 030A dbf')
 file_path = filedialog.askopenfilename()  # Открыть диалоговое окно выбора файла
 dbf = Dbf5(file_path, codec='CP866')
 
@@ -42,7 +42,7 @@ for row in df.itertuples():
 #-------------------------------------------------------------------------------
 # Работаем с ответом из РЭМД (csv файл) 
 data = {} 
-data_none = []
+data_error = []
 data_reg =[]
 for row in df_all.itertuples():
     # print(row.docNum, row.emdr_id)
@@ -60,7 +60,7 @@ for row in df_all.itertuples():
 for key in data:
     # рецепты с ошибкой из РЭМД
     if data[key] == 'nan':
-        data_none.append(key)
+        data_error.append(key)
 
     # рецепты зарегистрированные в РЭМД
     else:
@@ -80,7 +80,7 @@ for numR in data_all_num:
         num7 = numR[4:]
 
         text7 = num7 + '.xml успешно подписан'
-        for row in df7.itertuples():
+        for row in df7.itertuples(): # df7 датафрейм файла ExpVipSEMD_All (Протокол создания СЭМД)
 
             if row.DATE.year != 2024:
                 continue
@@ -98,7 +98,7 @@ for numR in data_all_num:
         else: # список не пустой, врач подписал. Но Асулон в РИП не отправил!
             time1 = ExpVipSEMD_All[-1]['TIME']
             date1 = ExpVipSEMD_All[-1]['DATE']
-            MSG1 = ExpVipSEMD_All[-1]['MSG'] + '  но в РИП СУИЗ не отправлен! напиши в техподдержку'
+            MSG1 = ExpVipSEMD_All[-1]['MSG'] + ' в процессе отправки в РИП СУИЗ ! Если последняя дата подписания больше 3-х дней - напиши в ТП'
             not_SEMD.append({'Рецепт_№': numR, 'Дата': dict_num[numR][0], 'Врач': dict_num[numR][1], 'текст': MSG1, 'ДАТА последней подписи': date1, 'Время': time1})
 
 df_n_semd = pd.DataFrame(data=not_SEMD)
@@ -108,18 +108,18 @@ df_n_semd.to_excel('Not_SEMD.xlsx', index=False)
 #--------------------------------------------------------------------------------
 # СЭМДы вернувшиеся с ошибкой из РЭМД
 error_SEMD = []
-for numR in data_none:
+for numR in data_error:
     x = df_all[df_all['docNum'] == numR]
     if 'NOT_UNIQUE_PROVIDED_ID' in x['error_id'].values:
         # Уже зареганные в РЭМД за ошибку не считаем
         data_reg.append(numR)
         continue
     text = x['error_txt'].values[-1]
-    vrach = x['FIO_Signer'].values[0]
-    messId = x['messId'].values[0]
-    Snils_vrach = x['Snils_Signer'].values[0]
+    vrach = x['FIO_Signer'].values[-1]
+    messId = x['messId'].values[-1]
+    Snils_vrach = x['Snils_Signer'].values[-1]
     Snils_pasient = 'нет данных о СНИЛС'
-    date = 'None, скорее всего рецепт испорчен'
+    date = 'Нет информации о дате'
 
     n = numR.replace(' ','')
     if n in numR_snils:
@@ -127,9 +127,9 @@ for numR in data_none:
         date = (dict_num[numR])[0]
 
     if str(text) == 'nan':
-        text = 'РИП СУИЗ не вернул ответ РЭМДа в АСУЛОН. Пиши в техподдержку, если с даты отправки СЭМД прошло более 3-х дней '
+        text = 'РИП СУИЗ не вернул ответ РЭМДа в АСУЛОН. Пиши в техподдержку, Если с даты отправки СЭМД прошло более 4-х дней '
 
-    error_SEMD.append({'Рецепт_№':numR,'messId':messId,'ОШИБКА':text, 'Врач':vrach, 'Врач_СНИЛС':Snils_vrach, 'Пациент_СНИЛС':Snils_pasient, 'ДАТА рецепта':date})
+    error_SEMD.append({'Рецепт_№':numR,'messId':messId,'ОШИБКА':text, 'Врач':vrach, 'Врач СНИЛС':Snils_vrach, 'Пациент СНИЛС':Snils_pasient, 'ДАТА рецепта':date})
     
 df_error_semd = pd.DataFrame(data=error_SEMD)
 df_error_semd.to_excel('ERROR_SEMD.xlsx', index=False)
