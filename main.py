@@ -1,4 +1,4 @@
-   import pandas as pd
+import pandas as pd
 from simpledbf import Dbf5
 import tkinter as tk
 from tkinter import filedialog
