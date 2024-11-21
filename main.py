@@ -1,8 +1,8 @@
 import pandas as pd
 from simpledbf import Dbf5
+from datetime import datetime
 import tkinter as tk
 from tkinter import filedialog
-from datetime import datetime
 
 root = tk.Tk()
 root.withdraw()  # Скрыть главное окно
@@ -11,7 +11,7 @@ print('Выбери ExpVipSEMD_All dbf')
 
 file_path = filedialog.askopenfilename()  # Открыть диалоговое окно выбора файла
 
-print('Внимание! начало чтения большого файла   Время: ', datetime.now())
+print(' Начало чтения большого файла   Время: ', datetime.now())
 dbf7 = Dbf5(file_path, codec='CP866')
 df7 = dbf7.to_dataframe()
 # Преобразуем колонку DATE в формат datetime, если это еще не сделано
@@ -23,11 +23,11 @@ df7 = df_2024[df_2024['MSG'].str.contains("успешно", na=False)]
 df_2024=''
 print()
 
-print('Выбери форму F 030A dbf')
+print(' Выбери форму F 030A dbf')
 file_path = filedialog.askopenfilename()  # Открыть диалоговое окно выбора файла
 dbf = Dbf5(file_path, codec='CP866')
 print()
-print('Выбери отчет РЭМД csv')
+print(' Выбери отчет РЭМД csv')
 file_path2 = filedialog.askopenfilename()  # Открыть диалоговое окно выбора файла
 df_all = pd.read_csv(file_path2, sep=';', encoding='windows-1251')
 
@@ -36,7 +36,7 @@ print('  Ждите, идет обработка файлов ...')
 print()
 # --------------------------------------------------------------------------
 # Работаем с формой Ф-030А (dbf файл)
-print('Начало с формой F030', datetime.now())
+print(' Начало с формой F030', datetime.now())
 print()
 df = dbf.to_dataframe()
 # print(df)
@@ -59,7 +59,7 @@ for row in df.itertuples():
 data_all_num = list(set(data_all_num))
 # -------------------------------------------------------------------------------
 # Работаем с ответом из РЭМД (csv файл)
-print('Начало с csv файлом, создание словарей   Время: ', datetime.now())
+print(' Начало с csv файлом, создание словарей   Время: ', datetime.now())
 print()
 data = {}
 data_error = []
@@ -86,14 +86,16 @@ data_reg = [key for key, value in data.items() if value is not None]
 
 
 # --------------------------------------------------------------------------------
-print('Начало поиска несозданных СЭМД (самая большая итерация)   Время: ', datetime.now())
+print(' Количество рецептов подлежащих обработке: ', len(data_all_num))
+print()
+print(' Начало поиска несозданных СЭМД (самая большая итерация)   Время: ', datetime.now())
 print()
 # Фильтруем df7 заранее, чтобы не проверять date в каждой итерации
 df7_filtered = df7[df7['DATE'].dt.year == 2024]
 
 not_SEMD = []
 set_data = set(data)  # Для O(1) проверки наличия
-
+i = 1 # счетчик
 for numR in data_all_num:
     if numR not in set_data:  # Проверяем, есть ли номер рецепта в словаре
         num7 = numR[4:]
@@ -122,16 +124,25 @@ for numR in data_all_num:
                 'ДАТА последней подписи': last_record['DATE'],
                 'Время': last_record['TIME']
             })
+    if i % 1000 == 0:
+        print(f'  Обработано  {i}  рецептов ...')
+    i += 1
 
 df_n_semd = pd.DataFrame(data=not_SEMD)
 df_n_semd.to_excel('Not_SEMD2.xlsx', index=False)
-
+print()
 # --------------------------------------------------------------------------------
 # СЭМДы вернувшиеся с ошибкой из РЭМД
-print('Начало обработки СЭМД вернувшиеся с ошибкой из РЭМД   Время: ', datetime.now())
+print(' Начало обработки СЭМД вернувшиеся с ошибкой из РЭМД   Время: ', datetime.now())
 print()
 error_SEMD = []
+i = 1 # счетчик
 for numR in data_error:
+
+    if i % 100 == 0:
+        print(f'  Обработано  {i}  рецептов ...')
+    i += 1
+
     x = df_all[df_all['docNum'] == numR]
     if 'NOT_UNIQUE_PROVIDED_ID' in x['error_id'].values:
         # Уже зареганные в РЭМД за ошибку не считаем
@@ -152,8 +163,9 @@ for numR in data_error:
     if str(text) == 'nan':
         text = 'РИП СУИЗ не вернул ответ РЭМДа в АСУЛОН. Пиши в техподдержку, Если с даты отправки СЭМД прошло более 4-х дней '
 
-    error_SEMD.append({'Рецепт_№': numR, 'messId': messId, 'ОШИБКА': text, 'Врач': vrach, 'Врач СНИЛС': Snils_vrach,
-                       'Пациент СНИЛС': Snils_pasient, 'ДАТА рецепта': date})
+    error_SEMD.append({'Рецепт_№': numR, 'ДАТА рецепта': date, 'ОШИБКА': text, 'Врач': vrach, 'Врач СНИЛС': Snils_vrach,
+                       'Пациент СНИЛС': Snils_pasient, 'messId': messId,})
+
 
 df_error_semd = pd.DataFrame(data=error_SEMD)
 df_error_semd.to_excel('ERROR_SEMD2.xlsx', index=False)
@@ -162,4 +174,8 @@ df_error_semd.to_excel('ERROR_SEMD2.xlsx', index=False)
 data_reg.sort()
 df_reg_semd = pd.DataFrame(data=data_reg, columns=['docNum'])
 df_reg_semd.to_excel('REG_SEMD2.xlsx', index=False)
-input('Конец выполнения скрипта, нажми ENTER...')
+print()
+p = round(100*len(data_reg)/len(data_all_num), 2)
+print(f'Процент успешно зарегистрированных рецептов:  {p}  %     Время: ', datetime.now())
+print()
+input(' Конец выполнения скрипта, нажми ENTER...')
