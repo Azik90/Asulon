@@ -1,35 +1,75 @@
 import pandas as pd
 from simpledbf import Dbf5
 from datetime import datetime
-import tkinter as tk
-from tkinter import filedialog
+import PySimpleGUI as sg
 
-root = tk.Tk()
-root.withdraw()  # Скрыть главное окно
-print()
-print('Выбери ExpVipSEMD_All dbf')
+# Создаем макет окна
+layout = [[sg.Text('ВВЕДИТЕ ГОД ')],
+            [sg.InputText()],
+        [sg.Text('Выбери ExpVipSEMD_All dbf')],
+          [sg.Input(), sg.FileBrowse()],
+        [sg.Text('Выбери форму F 030A dbf')],
+          [sg.Input(), sg.FileBrowse()],
+        [sg.Text('Выбери отчет РЭМД csv')],
+          [sg.Input(), sg.FileBrowse()],
+          [sg.Button('OK'), sg.Button('Cancel')]]
 
-file_path = filedialog.askopenfilename()  # Открыть диалоговое окно выбора файла
+# Создаем окно
+window = sg.Window('Выбор файла', layout)
 
+# События в цикле обработки событий
+event, values = window.read()
+
+# Закрываем окно
+window.close()
+file_path1 = ''
+file_path2 = ''
+file_path3 = ''
+d_year = ''
+# Проверяем, была ли нажата кнопка "OK"
+if event == 'OK':
+    d_year = values[0]  # Получаем выбранный файл
+    file_path1 = values[1]  # Получаем выбранный файл
+    file_path2 = values[2]  # Получаем выбранный файл
+    file_path3 = values[3]  # Получаем выбранный файл
+    # ПРОВЕРКА НА ЦИФРЫ В СТРОКЕ
+    if d_year.isdigit() == False:
+        sg.popup('ВЫ ВВЕЛИ НЕПРАВИЛЬНО ГОД!\n\nГОД ДОЛЖЕН СОДЕРЖАТЬ ТОЛЬКО ЦИФРЫ!\n\nВЫХОД')
+        exit()
+    elif d_year not in ['2023', '2024', '2025', '2026', '2027', '2028', '2029']:
+        sg.popup('ВЫ ВВЕЛИ НЕПРАВИЛЬНО ГОД!\n\nВЫХОД')
+        exit()
+    d_year = int(d_year) # теперь год переведем в int значение
+    if (d_year and file_path1 and file_path2 and file_path3) == '':
+        print('  Не все файлы указаны ...')
+        sg.popup('Не все файлы указаны !\n\nВЫХОД')
+        exit()
+
+
+    print(f'Выбранный файл: {d_year}')
+    print(f'Выбранный файл: {file_path1}')
+    print(f'Выбранный файл: {file_path2}')
+    print(f'Выбранный файл: {file_path3}')
+else:
+    print('Выбор файлов отменен')
+    exit()
+#----------------------------------------------------------------------------------
 print(' Начало чтения большого файла   Время: ', datetime.now())
-dbf7 = Dbf5(file_path, codec='CP866')
+dbf7 = Dbf5(file_path1, codec='CP866')
 df7 = dbf7.to_dataframe()
 # Преобразуем колонку DATE в формат datetime, если это еще не сделано
 df7['DATE'] = pd.to_datetime(df7['DATE'], errors='coerce')
-df_2024 = df7[df7['DATE'].dt.year == 2024]
+df_2024 = df7[df7['DATE'].dt.year == d_year]
 
 # Создаем новый DataFrame, фильтруя строки с фразой "успешно" в 'MSG1'
 df7 = df_2024[df_2024['MSG'].str.contains("успешно", na=False)]
 df_2024=''
 print()
 
-print(' Выбери форму F 030A dbf')
-file_path = filedialog.askopenfilename()  # Открыть диалоговое окно выбора файла
-dbf = Dbf5(file_path, codec='CP866')
+dbf = Dbf5(file_path2, codec='CP866')
 print()
-print(' Выбери отчет РЭМД csv')
-file_path2 = filedialog.askopenfilename()  # Открыть диалоговое окно выбора файла
-df_all = pd.read_csv(file_path2, sep=';', encoding='windows-1251')
+
+df_all = pd.read_csv(file_path3, sep=';', encoding='windows-1251')
 
 print()
 print('  Ждите, идет обработка файлов ...')
@@ -91,7 +131,7 @@ print()
 print(' Начало поиска несозданных СЭМД (самая большая итерация)   Время: ', datetime.now())
 print()
 # Фильтруем df7 заранее, чтобы не проверять date в каждой итерации
-df7_filtered = df7[df7['DATE'].dt.year == 2024]
+df7_filtered = df7[df7['DATE'].dt.year == d_year]
 
 not_SEMD = []
 set_data = set(data)  # Для O(1) проверки наличия
@@ -128,8 +168,13 @@ for numR in data_all_num:
         print(f'  Обработано  {i}  рецептов ...')
     i += 1
 
+# Получаем текущее время
+now = datetime.now()
+# Форматируем строку в нужном формате
+text_d = f"{now.month:02}_{now.day:02}_{now.hour:02}_{now.minute:02}"
+
 df_n_semd = pd.DataFrame(data=not_SEMD)
-df_n_semd.to_excel('Not_SEMD2.xlsx', index=False)
+df_n_semd.to_excel(f'Not_SEMD_{text_d}.xlsx', index=False)
 print()
 # --------------------------------------------------------------------------------
 # СЭМДы вернувшиеся с ошибкой из РЭМД
@@ -168,14 +213,14 @@ for numR in data_error:
 
 
 df_error_semd = pd.DataFrame(data=error_SEMD)
-df_error_semd.to_excel('ERROR_SEMD2.xlsx', index=False)
+df_error_semd.to_excel(f'ERROR_SEMD_{text_d}.xlsx', index=False)
 
 # отсортируем список зарегистрированных
 data_reg.sort()
 df_reg_semd = pd.DataFrame(data=data_reg, columns=['docNum'])
-df_reg_semd.to_excel('REG_SEMD2.xlsx', index=False)
+df_reg_semd.to_excel(f'REG_SEMD_{text_d}.xlsx', index=False)
 print()
 p = round(100*len(data_reg)/len(data_all_num), 2)
 print(f'Процент успешно зарегистрированных рецептов:  {p}  %     Время: ', datetime.now())
 print()
-input(' Конец выполнения скрипта, нажми ENTER...')
+sg.popup(f'Процент успешно зарегистрированных рецептов:  {p}  % \n\nУСПЕХ!   Конец выполнения программ!\n\nВЫХОД')
