@@ -154,8 +154,6 @@ for numR in data_all_num:
 
         ExpVipSEMD_All = matching_rows[['DATE', 'TIME', 'MSG']].copy()
 
-        ExpVipSEMD_All_esklp = df_esklp[['DATE', 'TIME', 'MSG']].copy()
-
         if ExpVipSEMD_All.empty:  # Не был отправлен в РЭМД
             text_s = 'Врач не подписал с ЭПЦ выписанный рецепт (СЭМД не сформирован)'
 
