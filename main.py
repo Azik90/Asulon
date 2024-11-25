@@ -45,11 +45,6 @@ if event == 'OK':
         sg.popup('Не все файлы указаны !\n\nВЫХОД')
         exit()
 
-
-    print(f'Выбранный файл: {d_year}')
-    print(f'Выбранный файл: {file_path1}')
-    print(f'Выбранный файл: {file_path2}')
-    print(f'Выбранный файл: {file_path3}')
 else:
     print('Выбор файлов отменен')
     exit()
@@ -61,16 +56,30 @@ df7 = dbf7.to_dataframe()
 df7['DATE'] = pd.to_datetime(df7['DATE'], errors='coerce')
 df_2024 = df7[df7['DATE'].dt.year == d_year]
 
-# Создаем новый DataFrame, фильтруя строки с фразой "успешно" в 'MSG1'
+# Создаем новый DataFrame, фильтруя строки с фразой "успешно" в 'MSG'
 df7 = df_2024[df_2024['MSG'].str.contains("успешно", na=False)]
-df_2024=''
-print()
 
+# Создаем новый DataFrame, фильтруя строки с фразой "ЕСКЛП" в 'MSG'
+df_esklp = df_2024[df_2024['MSG'].str.contains("ЕСКЛП", na=False)]
+data_esklp = set() # номера рецептов, где возникла ошибка ЕСКПЛ
+del df_2024 # высвободим из ОЗУ
+
+for row in df_esklp.itertuples():
+    num = ''
+    if 'ЕСКЛП' in row.MSG:
+        text = (row.MSG).split('.')
+        text2 = text[0].split(' ')
+        num = text2[1]+' '+text2[2]
+
+        data_esklp.add(num)
+
+data_esklp = list(data_esklp)
+
+# F030A
 dbf = Dbf5(file_path2, codec='CP866')
-print()
 
+# Протолок отправки в РЭМД
 df_all = pd.read_csv(file_path3, sep=';', encoding='windows-1251')
-
 print()
 print('  Ждите, идет обработка файлов ...')
 print()
@@ -80,12 +89,11 @@ print(' Начало с формой F030', datetime.now())
 print()
 df = dbf.to_dataframe()
 # print(df)
-data_all_num = []
+data_all_num = [] # номера всех рецептов за год
 dict_num = {}  # для связки номера рецепта с датой выписки и врачем
 numR_snils = {}  # для связки номера рецепта со СНИЛС пацента
 
 for row in df.itertuples():
-    # print(row.docNum, row.emdr_id)
 
     docNum = str(row.SN_LR)
     data_all_num.append(docNum)
@@ -146,12 +154,18 @@ for numR in data_all_num:
 
         ExpVipSEMD_All = matching_rows[['DATE', 'TIME', 'MSG']].copy()
 
+        ExpVipSEMD_All_esklp = df_esklp[['DATE', 'TIME', 'MSG']].copy()
+
         if ExpVipSEMD_All.empty:  # Не был отправлен в РЭМД
+            text_s = 'Врач не подписал с ЭПЦ выписанный рецепт (СЭМД не сформирован)'
+
+            if numR in data_esklp:
+                text_s = 'Врач подписал рецепт, но возникла ошибка связанная с ЕСКЛП. Напиши в ТП (СЭМД не сформирован)'
             not_SEMD.append({
                 'Рецепт_№': numR,
                 'Дата': dict_num[numR][0],
                 'Врач': dict_num[numR][1],
-                'текст': 'Врач не подписал с ЭПЦ выписанный рецепт (СЭМД не сформирован)'
+                'текст': text_s
             })
         else:  # Врач подписал
             last_record = ExpVipSEMD_All.iloc[-1]
