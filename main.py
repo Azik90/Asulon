@@ -114,19 +114,21 @@ data_error = []
 data_reg = []
 
 for row in df_all.itertuples(index=False):  # index=False для экономии памяти
-    id_remd = str(row.emdr_id)
+    # print(row)
+    # exit()
+    id_remd = str(row._4)
 
     # Если id_remd 'nan', устанавливаем его в None для удобства проверки
     if id_remd == 'nan':
         id_remd = None
 
     # Если номер рецепта уже есть в словаре
-    previous_id = data.get(row.docNum)
+    previous_id = data.get(row._1)
     if previous_id is not None and previous_id is not None:  # если уже есть и не 'nan'
         continue
 
     # Сохраняем значение в словаре
-    data[row.docNum] = id_remd
+    data[row._1] = id_remd
 
 # Разделяем ключи на те, что с ошибками, и зарегистрированные
 data_error = [key for key, value in data.items() if value is None]
@@ -200,15 +202,15 @@ for numR in data_error:
         print(f'  Обработано  {i}  рецептов ...')
     i += 1
 
-    x = df_all[df_all['docNum'] == numR]
-    if 'NOT_UNIQUE_PROVIDED_ID' in x['error_id'].values:
+    x = df_all[df_all['Серия и номер рецепта'] == numR]
+    if ('NOT_UNIQUE_PROVIDED_ID' in x['Статус отправки'].values[-1]) or ('success' in x['Статус отправки'].values[-1]):
         # Уже зареганные в РЭМД за ошибку не считаем
         data_reg.append(numR)
         continue
-    text = x['error_txt'].values[-1]
-    vrach = x['FIO_Signer'].values[-1]
-    messId = x['messId'].values[-1]
-    Snils_vrach = x['Snils_Signer'].values[-1]
+    text = x['Статус отправки'].values[-1]
+    vrach = x['ФИО автора'].values[-1]
+    messId = x['Локальный идентификатор'].values[-1]
+    Snils_vrach = x['СНИЛС автора'].values[-1]
     Snils_pasient = 'нет данных о СНИЛС'
     date = 'Нет информации о дате'
 
@@ -219,7 +221,7 @@ for numR in data_error:
 
     if str(text) == 'nan':
         text = 'РИП СУИЗ не вернул ответ РЭМДа в АСУЛОН. Пиши в техподдержку, Если с даты отправки СЭМД прошло более 4-х дней '
-
+    
     error_SEMD.append({'Рецепт_№': numR, 'ДАТА рецепта': date, 'ОШИБКА': text, 'Врач': vrach, 'Врач СНИЛС': Snils_vrach,
                        'Пациент СНИЛС': Snils_pasient, 'messId': messId,})
 
