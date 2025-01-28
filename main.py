@@ -146,6 +146,7 @@ df7_filtered = df7[df7['DATE'].dt.year == d_year]
 not_SEMD = []
 set_data = set(data)  # Для O(1) проверки наличия
 i = 1 # счетчик
+NumLpu=''
 for numR in data_all_num:
     if numR not in set_data:  # Проверяем, есть ли номер рецепта в словаре
         num7 = numR[4:]
@@ -181,11 +182,13 @@ for numR in data_all_num:
     if i % 1000 == 0:
         print(f'  Обработано  {i}  рецептов ...')
     i += 1
-
+    NumLpu = numR
+# Получаем код медорганизации
+NumLpu0 = NumLpu[6:10]
 # Получаем текущее время
 now = datetime.now()
 # Форматируем строку в нужном формате
-text_d = f"{now.month:02}_{now.day:02}_{now.hour:02}_{now.minute:02}"
+text_d = f"MO № {NumLpu0}-{now.day:02}_{now.month:02}_{now.minute:02}_{now.hour:02}"
 
 df_n_semd = pd.DataFrame(data=not_SEMD)
 df_n_semd.to_excel(f'Not_SEMD_{text_d}.xlsx', index=False)
@@ -221,7 +224,7 @@ for numR in data_error:
 
     if str(text) == 'nan':
         text = 'РИП СУИЗ не вернул ответ РЭМДа в АСУЛОН. Пиши в техподдержку, Если с даты отправки СЭМД прошло более 4-х дней '
-    
+
     error_SEMD.append({'Рецепт_№': numR, 'ДАТА рецепта': date, 'ОШИБКА': text, 'Врач': vrach, 'Врач СНИЛС': Snils_vrach,
                        'Пациент СНИЛС': Snils_pasient, 'messId': messId,})
 
